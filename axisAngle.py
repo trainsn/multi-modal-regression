@@ -7,7 +7,8 @@ from torch import nn
 import torch.nn.functional as F
 import numpy as np
 from helperFunctions import eps
-
+import pdb
+import math
 
 """
 Numpy functions
@@ -168,3 +169,23 @@ class geodesic_loss(nn.Module):
 			return torch.mean(theta)
 		else:
 			return theta
+
+class viewpoint_geodesic_loss(nn.Module):
+	
+	def __init__(self, reduce=True):
+		super().__init__()
+		self.reduce = reduce
+		self.eps = eps
+		
+	def forward(self, ypred, ytrue):
+		ypred = ypred/180*math.pi
+		ytrue = ytrue.squeeze()/180*math.pi
+		tmp = torch.sin(ypred[:,1])*torch.sin(ytrue[:,1]) + torch.cos(ypred[:,1])*torch.cos(ytrue[:,1])*torch.cos(ypred[:,0]-ytrue[:,0])
+		dist = torch.acos(torch.clamp(tmp, -1+self.eps, 1-self.eps))
+		#pdb.set_trace()
+		if self.reduce:
+			return torch.mean(dist)
+		else:
+			return dist
+		 
+		

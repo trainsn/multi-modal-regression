@@ -17,6 +17,7 @@ import scipy.io as spio
 from scipy.spatial.distance import cdist
 import os
 import pickle
+import pdb
 
 normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 preprocess_render = transforms.Compose([transforms.Resize([224, 224]), transforms.ToTensor(), normalize])
@@ -31,14 +32,20 @@ class ImagesAll(Dataset):
 		self.db_type = db_type
 		self.ydata_type = ydata_type
 		self.list_image_names = []
-		for i in range(self.num_classes):
-			tmp = spio.loadmat(os.path.join(self.db_path, self.classes[i] + '_info'), squeeze_me=True)
-			image_names = tmp['image_names']
-			self.list_image_names.append(image_names)
+		for i in range(1):
+		    for filename in os.listdir(os.path.join(self.db_path, self.classes[i])):
+			    	#print(filename)
+			    	self.list_image_names.append(filename)
+#		for i in range(self.num_classes):
+#			tmp = spio.loadmat(os.path.join(self.db_path, self.classes[i] + '_info'), squeeze_me=True)
+#			#print(tmp)
+#			image_names = tmp['imagenet_train']
+#			self.list_image_names.append(image_names)
 		self.num_images = np.array([len(self.list_image_names[i]) for i in range(self.num_classes)])
 		normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 		self.preprocess = transforms.Compose([transforms.Resize([224, 224]), transforms.ToTensor(), normalize])
 		self.image_names = self.list_image_names
+		#print(self.image_names)
 
 	def __len__(self):
 		return np.amax(self.num_images)
@@ -46,13 +53,16 @@ class ImagesAll(Dataset):
 	def __getitem__(self, idx):
 		# return sample with xdata, ydata, label
 		xdata, ydata, label = [], [], []
-		for i in range(self.num_classes):
-			image_name = self.image_names[i][idx % self.num_images[i]]
-			label.append(i*torch.ones(1).long())
+		for i in range(1):
+    
+			image_name = self.image_names[i]
+			label.append(i*torch.ones(1).long())   
 			# read image
-			img_pil = Image.open(os.path.join(self.db_path, self.classes[i], image_name + '.png'))
+			#print(self.image_names)
+			img_pil = Image.open(os.path.join(self.db_path, self.classes[i], image_name))
 			xdata.append(self.preprocess(img_pil))
 			# parse image name to get correponding target
+			#pdb.set_trace()
 			_, _, az, el, ct, _ = parse_name(image_name)
 			if self.db_type == 'real':
 				R = rotation_matrix(az, el, ct)
@@ -74,7 +84,8 @@ class ImagesAll(Dataset):
 		return sample
 
 	def shuffle_images(self):
-		self.image_names = [np.random.permutation(self.list_image_names[i]) for i in range(self.num_classes)]
+		#self.image_names = [np.random.permutation(self.list_image_names[i]) for i in range(self.num_classes)]
+		pass
 
 
 class Pascal3dAll(Dataset):
@@ -140,6 +151,7 @@ class MultibinImages(ImagesAll):
 		# add the kmeans part
 		self.kmeans = pickle.load(open(kmeans_file, 'rb'))
 		self.num_clusters = self.kmeans.n_clusters
+		#pdb.set_trace()
 		if self.problem_type == 'm2':
 			self.key_rotations = [get_R(y) for y in self.kmeans.cluster_centers_]
 
@@ -167,6 +179,62 @@ class MultibinImages(ImagesAll):
 		else:
 			ydata_res = ydata - self.kmeans.cluster_centers_[ydata_bin, :]
 		sample['ydata_res'] = torch.from_numpy(ydata_res).float()
+		#print(sample)
+		return sample
+	
+# use PIL Image to read image
+def default_loader(path):
+    try:
+        img = Image.open(path)
+        return img.convert('RGB')
+    except:
+        print("Cannot read image: {}".format(path))
+		
+class ViewpointImages(Dataset):
+	def __init__(self, img_path, txt_path, kmeans_file, dataset = '', data_transforms=None, loader = default_loader):
+		with open(txt_path) as input_file:
+			lines = input_file.readlines()
+			self.img_name = [os.path.join(line.strip().split(' ')[0]) for line in lines]
+			self.img_label = [int(line.strip().split(' ')[-1]) for line in lines]
+		self.data_transforms = data_transforms
+		self.dataset = dataset
+		self.loader = loader
+		self.kmeans = pickle.load(open(kmeans_file, 'rb'))
+		self.num_clusters = self.kmeans.n_clusters
+		
+		self.azimuths = []
+		self.elevations = []
+		f = open('/home/cad/disk/linux/RenderForCNN-master/train/angle_class.txt', 'r')
+		for line in f.readlines():
+			self.elevations.append(float(line.split()[1]))
+			self.azimuths.append(float(line.split()[2]))
+		
+
+	def __len__(self):
+		return len(self.img_name)
+
+	def __getitem__(self, item):
+		img_name = self.img_name[item]
+		label = self.img_label[item]
+		xdata = self.loader(img_name)
+		ydata = []
+		if self.data_transforms is not None:
+			try:
+				xdata = self.data_transforms[self.dataset](xdata)
+			except:
+				print("Cannot transform image: {}".format(img_name))
+
+		ydata = np.array([[self.azimuths[label], self.elevations[label]]])	
+		#binpart 
+		ydata_bin = self.kmeans.predict(ydata)
+		# residual part	
+		ydata_res = ydata - self.kmeans.cluster_centers_[ydata_bin, :]
+		#print(ydata, ydata_bin, ydata_res)
+		sample = {'xdata': xdata, 'ydata': ydata}
+		sample['ydata_bin'] = torch.from_numpy(ydata_bin).long()
+		sample['ydata_res'] = torch.from_numpy(ydata_res).float()
+		#pdb.set_trace()
+		
 		return sample
 
 

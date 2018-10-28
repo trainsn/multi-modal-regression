@@ -17,7 +17,7 @@ image_dir = fullfile(db_path, 'Images');
 sets_path = fullfile(db_path, 'Image_sets');
 
 % start parallel processing
-poolobj = parpool(16);
+%poolobj = parpool(6);
 
 % get imagenet data: Train + Val
 fprintf('**********************Imagenet-Train+Val: \n');
@@ -64,7 +64,7 @@ end
 pascal_val = pascal_val(ind>0);
 
 % close parallel threads
-delete(poolobj);
+%delete(poolobj);
 
 % save the train and val data
 save(fullfile(save_dir, sprintf('%s_info', cls)), 'imagenet_train', 'imagenet_val', 'pascal_train', 'pascal_val');

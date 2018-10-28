@@ -87,7 +87,7 @@ class my_model(nn.Module):
 
 # my_model
 model = my_model()
-# print(model)
+print(model)
 # loss and optimizer
 criterion = nn.CrossEntropyLoss().cuda()
 optimizer = optim.Adam(model.parameters(), lr=init_lr)

@@ -21,12 +21,13 @@ eps = 1e-6
 # parse the name of the image to get model and pose parameters
 def parse_name(image_name):
 	ind = [match.start() for match in re.finditer('_', image_name)]
+	#print(ind)
 	synset_str = image_name[:ind[0]]
 	model_str = image_name[ind[0]+1:ind[1]]
 	az = float(image_name[ind[1]+2:ind[2]])
 	el = float(image_name[ind[2]+2:ind[3]])
 	ct = float(image_name[ind[3]+2:ind[4]])
-	d = float(image_name[ind[4]+2:])
+	d = float(image_name[ind[4]+2:-4])
 	return synset_str, model_str, az, el, ct, d
 
 

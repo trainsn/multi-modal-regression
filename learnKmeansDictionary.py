@@ -12,6 +12,7 @@ from sklearn.cluster import KMeans
 import pickle
 import progressbar
 import sys
+import os
 
 # relevant paths
 image_path = 'data/renderforcnn'
@@ -19,18 +20,21 @@ image_path = 'data/renderforcnn'
 # relevant variables
 num_clusters = int(sys.argv[1])
 print('num_clusters: ', num_clusters)
-kmeans_file = 'data/kmeans_dictionary_axis_angle_' + str(num_clusters) + '.pkl'
+kmeans_file = 'data/kmeans_' + str(num_clusters) + '_.pkl'
 
 # setup data loader to access the images
-train_data = ImagesAll(image_path, 'render')
-image_names = np.concatenate(train_data.list_image_names)
+#train_data = ImagesAll(image_path, 'render')
+#image_names = np.concatenate(train_data.list_image_names)
+image_names = os.listdir(image_path + '/aeroplane')
 
 # get pose targets from training data
 bar = progressbar.ProgressBar()
 ydata = []
 for i in bar(range(len(image_names))):
 	image_name = image_names[i]
+	#print(image_name)
 	_, _, az, el, ct, _ = parse_name(image_name)
+	#print(az, el, ct)
 	R = rotation_matrix(az, el, -ct)
 	y = get_y(R)
 	ydata.append(y)

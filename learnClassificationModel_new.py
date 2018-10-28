@@ -24,8 +24,9 @@ import progressbar
 import sys
 import pickle
 from tensorboardX import SummaryWriter
+import pdb
 
-os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[1]
+#os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[1]
 
 # relevant paths
 render_path = 'data/renderforcnn/'
@@ -57,8 +58,8 @@ kmeans_dict = kmeans.cluster_centers_
 
 # DATA
 # datasets
-real_data = MultibinImages(augmented_path, 'real', 'c0', kmeans_file)
-render_data = MultibinImages(render_path, 'render', 'c0', kmeans_file)
+real_data = MultibinImages(pascal3d_path, 'real', 'c0', kmeans_file)
+render_data = MultibinImages(pascal3d_path, 'render', 'c0', kmeans_file)
 test_data = Pascal3dAll(pascal3d_path, 'test')
 # setup data loaders
 real_loader = DataLoader(real_data, batch_size=4, shuffle=True, num_workers=num_workers, pin_memory=True, collate_fn=my_collate)
@@ -88,7 +89,7 @@ class my_model(nn.Module):
 
 # my_model
 model = my_model()
-# print(model)
+print(model)
 # loss and optimizer
 criterion = nn.CrossEntropyLoss().cuda()
 optimizer = optim.Adam(model.parameters(), lr=init_lr)
@@ -102,9 +103,11 @@ count = 0
 def training():
 	global count, val_loss
 	model.train()
-	bar = progressbar.ProgressBar(max_value=len(render_loader))
+	#print(len(render_loader))
+	bar = progressbar.ProgressBar(maxval=len(render_loader))
 	for i, (sample_real, sample_render) in enumerate(zip(real_loader, render_loader)):
 		# forward steps
+		pdb.set_trace()
 		xdata_real = Variable(sample_real['xdata'].cuda())
 		label_real = Variable(sample_real['label'].cuda())
 		ydata_real = Variable(sample_real['ydata_bin'].cuda())

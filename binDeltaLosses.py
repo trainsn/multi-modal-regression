@@ -6,6 +6,8 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 from quaternion import convert_dictionary
 from helperFunctions import eps
+import pdb
+import math
 
 
 """
@@ -45,8 +47,9 @@ class GeodesicLoss(nn.Module):
 		# ypred = (score, residual)
 		l1 = self.ce(ypred[0], ytrue[0])
 		_, ind = torch.max(ypred[0], dim=1)
-		y = torch.index_select(self.cluster_centers_, 0, ind)
-		l2 = self.mse(y+ypred[1], ytrue[1])
+		y1 = torch.index_select(self.cluster_centers_, 0, ind)
+		y2 = torch.index_select(self.cluster_centers_, 0, ytrue[0])
+		l2 = self.mse(y1+ypred[1], y2+ytrue[1])
 		return torch.add(l1, self.alpha, l2)
 
 
@@ -245,15 +248,16 @@ class loss_m0(nn.Module):
 		super().__init__()
 		self.alpha = alpha
 		self.mse = nn.MSELoss().cuda()
-		self.ce = nn.CrossEntropyLoss().cuda()
+		self.ce = nn.CrossEntropyLoss(reduce=True, size_average=True).cuda()
 
 	def forward(self, ypred, ytrue):
 		# ytrue = [ydata_bin, ydata_res]
 		# ypred = [score, residual]
-		l1 = self.ce(ypred[0], ytrue[0])
-		l2 = self.mse(ypred[1], ytrue[1])
-		return torch.add(l1, self.alpha, l2)
-
+		#pdb.set_trace()
+		l1 = self.ce(ypred[0], ytrue[0].squeeze())
+		l2 = self.mse(ypred[1], ytrue[1].squeeze())
+		return torch.add(l1, self.alpha/180*math.pi, l2)
+		#return l1
 
 class loss_m1(nn.Module):
 	def __init__(self, alpha, kmeans_file, my_loss=None):
@@ -269,11 +273,14 @@ class loss_m1(nn.Module):
 
 	def forward(self, ypred, ytrue):
 		# ytrue = (ydata_label, ydata)
-		# ypred = (score, residual)
-		l1 = self.ce(ypred[0], ytrue[0])
+		# ypred = (score, residual)		
+		l1 = self.ce(ypred[0], ytrue[0].squeeze())
 		_, ind = torch.max(ypred[0], dim=1)
-		y = torch.index_select(self.cluster_centers_, 0, ind)
-		l2 = self.mse(y+ypred[1], ytrue[1])
+		y1 = torch.index_select(self.cluster_centers_, 0, ind)
+		y2 = torch.index_select(self.cluster_centers_, 0, ytrue[0].squeeze())
+		l2 = self.mse(y1+ypred[1], y2+ytrue[1].squeeze())
+
+		#pdb.set_trace()
 		return torch.add(l1, self.alpha, l2)
 
 

@@ -29,7 +29,6 @@ if len(sys.argv) > 1:
 	os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[1]
 
 # relevant paths
-render_path = 'data/renderforcnn/'
 augmented_path = 'data/augmented2/'
 pascal3d_path = 'data/original'
 
@@ -63,13 +62,12 @@ criterion2 = loss_m1(1.0, kmeans_file, geodesic_loss().cuda())
 # DATA
 # datasets
 real_data = MultibinImages(augmented_path, 'real', problem_type, kmeans_file)
-render_data = MultibinImages(render_path, 'render', problem_type, kmeans_file)
+print(real_data)
 test_data = Pascal3dAll(pascal3d_path, 'test')
 # setup data loaders
 real_loader = DataLoader(real_data, batch_size=4, shuffle=True, num_workers=num_workers, pin_memory=True, collate_fn=my_collate)
-render_loader = DataLoader(render_data, batch_size=4, shuffle=True, num_workers=num_workers, pin_memory=True, collate_fn=my_collate)
-test_loader = DataLoader(test_data, batch_size=32, collate_fn=my_collate)
-print('Real: {0} \t Render: {1} \t Test: {2}'.format(len(real_loader), len(render_loader), len(test_loader)))
+test_loader = DataLoader(test_data, batch_size=8, collate_fn=my_collate)
+print('Real: {0} \t Test: {1}'.format(len(real_loader),  len(test_loader)))
 
 
 # MODEL
@@ -80,8 +78,9 @@ class my_model(nn.Module):
 		self.num_classes = num_classes
 		self.num_clusters = num_clusters
 		self.feature_model = resnet_model('resnet50', 'layer4').cuda()
-		self.bin_models = nn.ModuleList([bin_3layer(N0, N1, N2, num_clusters) for i in range(self.num_classes)]).cuda()
-		self.res_models = nn.ModuleList([res_2layer(N0, N3, ndim) for i in range(self.num_classes * self.num_clusters)]).cuda()
+		self.bin_models = nn.Sequential(bin_3layer(N0, N1, N2, num_clusters)).cuda()
+		self.res_models = nn.ModuleList([res_2layer(N0, N3, ndim) for i in range(self.num_clusters)]).cuda()	
+		#print(self.bin_models)
 
 	def forward(self, x, class_label):
 		x = self.feature_model(x)
@@ -102,7 +101,7 @@ class my_model(nn.Module):
 
 # my_model
 model = my_model()
-# print(model)
+#print(model)
 # loss and optimizer
 optimizer = optim.Adam(model.parameters(), lr=init_lr)
 scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.1)
@@ -116,34 +115,29 @@ def training_m0(save_loss=False):
 	global train_loss_sum
 	global train_samples
 	model.train()
-	bar = progressbar.ProgressBar(max_value=len(render_loader))
-	for i, (sample_real, sample_render) in enumerate(zip(real_loader, render_loader)):
+	bar = progressbar.ProgressBar(maxval=len(real_loader))
+	bar.start()
+	for i, sample_real in enumerate(real_loader):
 		# forward steps
 		xdata_real = Variable(sample_real['xdata'].cuda())
 		label_real = Variable(sample_real['label'].cuda())
 		ydata_real = [Variable(sample_real['ydata_bin'].cuda()), Variable(sample_real['ydata_res'].cuda())]
 		output_real = model(xdata_real, label_real)
 		loss_real = criterion1(output_real, ydata_real)
-		xdata_render = Variable(sample_render['xdata'].cuda())
-		label_render = Variable(sample_render['label'].cuda())
-		ydata_render = [Variable(sample_render['ydata_bin'].cuda()), Variable(sample_render['ydata_res'].cuda())]
-		output_render = model(xdata_render, label_render)
-		loss_render = criterion1(output_render, ydata_render)
-		loss = loss_real + loss_render
+		loss = loss_real
 		optimizer.zero_grad()
 		loss.backward()
 		optimizer.step()
 		# store
 		bar.update(i)
-		train_loss_sum += (loss_real.data[0] * xdata_real.size(0) + loss_render.data[0] * xdata_render.size(0))
-		train_samples += (xdata_real.size(0) + xdata_render.size(0))
+		train_loss_sum += (loss_real.data[0] * xdata_real.size(0))
+		train_samples += (xdata_real.size(0))
 		if i % 1000 == 0 and save_loss:
 			train_loss.append(train_loss_sum / train_samples)
 		# cleanup
-		del xdata_real, xdata_render, label_real, label_render, ydata_real, ydata_render
-		del output_real, output_render, loss_real, loss_render, sample_real, sample_render, loss
+		del xdata_real, label_real,  ydata_real
+		del output_real, loss_real, sample_real, loss
 		gc.collect()
-	render_loader.dataset.shuffle_images()
 	real_loader.dataset.shuffle_images()
 
 
@@ -151,43 +145,39 @@ def training_m1(save_loss=False):
 	global train_loss_sum
 	global train_samples
 	model.train()
-	bar = progressbar.ProgressBar(max_value=len(render_loader))
-	for i, (sample_real, sample_render) in enumerate(zip(real_loader, render_loader)):
+	bar = progressbar.ProgressBar(maxval=len(real_loader))
+	bar.start()
+	for i, sample_real in enumerate(real_loader):
 		# forward steps
 		xdata_real = Variable(sample_real['xdata'].cuda())
 		label_real = Variable(sample_real['label'].cuda())
 		ydata_real = [Variable(sample_real['ydata_bin'].cuda()), Variable(sample_real['ydata'].cuda())]
 		output_real = model(xdata_real, label_real)
 		loss_real = criterion2(output_real, ydata_real)
-		xdata_render = Variable(sample_render['xdata'].cuda())
-		label_render = Variable(sample_render['label'].cuda())
-		ydata_render = [Variable(sample_render['ydata_bin'].cuda()), Variable(sample_render['ydata'].cuda())]
-		output_render = model(xdata_render, label_render)
-		loss_render = criterion2(output_render, ydata_render)
-		loss = loss_real + loss_render
+		loss = loss_real
 		optimizer.zero_grad()
 		loss.backward()
 		optimizer.step()
 		# store
 		bar.update(i)
-		train_loss_sum += (loss_real.data[0] * xdata_real.size(0) + loss_render.data[0] * xdata_render.size(0))
-		train_samples += (xdata_real.size(0) + xdata_render.size(0))
+		train_loss_sum += (loss_real.data[0] * xdata_real.size(0))
+		train_samples += (xdata_real.size(0) )
 		if i % 1000 == 0 and save_loss:
 			train_loss.append(train_loss_sum / train_samples)
 		# cleanup
-		del xdata_real, xdata_render, label_real, label_render, ydata_real, ydata_render
-		del output_real, output_render, loss_real, loss_render, sample_real, sample_render, loss
+		del xdata_real, label_real, ydata_real
+		del output_real, loss_real, sample_real, loss
 		gc.collect()
-	render_loader.dataset.shuffle_images()
 	real_loader.dataset.shuffle_images()
 
 
 def testing():
 	model.eval()
-	bar = progressbar.ProgressBar(max_value=len(test_loader))
+	bar = progressbar.ProgressBar(maxval=len(test_loader))
 	ypred = []
 	ytrue = []
 	labels = []
+	bar.start()
 	for i, sample in enumerate(test_loader):
 		xdata = Variable(sample['xdata'].cuda())
 		label = Variable(sample['label'].cuda())
@@ -233,7 +223,7 @@ for epoch in range(num_epochs):
 	# cleanup
 	gc.collect()
 # save plots
-spio.savemat(plots_file, {'train_loss': train_loss, 'train_init': train_init})
+#spio.savemat(plots_file, {'train_loss': train_loss, 'train_init': train_init})
 
 # evaluate the model
 ytest, yhat_test, test_labels = testing()

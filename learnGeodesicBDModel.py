@@ -95,7 +95,7 @@ class my_model(nn.Module):
 
 # my_model
 model = my_model()
-# print(model)
+print(model)
 # loss and optimizer
 optimizer = optim.Adam(model.parameters(), lr=init_lr)
 scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.1)
