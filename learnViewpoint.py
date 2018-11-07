@@ -118,7 +118,7 @@ train_loss_sum = 0.0
 train_samples = 0
 train_corrects = 0.0
 train_corrects_angle = [0.0, 0.0, 0.0, 0.0, 0.0]
-angle_tole = [2.37, 5.28, 8.53, 11.84, 15.17] 
+angle_tole = [2.36, 5.28, 8.53, 11.84, 15.17] 
 		
 def training_m0(save_loss=False):
 	global train_loss_sum
@@ -276,21 +276,21 @@ def save_checkpoint(filename):
 	torch.save(model.state_dict(), filename)
 	
 #training_m0(True)
-testing()		
+#testing()		
 
-#trian_loss_sum = 0.0
-#train_samples = 0
-#for epoch in range(num_epochs):
-#	tic = time.time()
-#	scheduler.step()
-#	# training step
-#	training_m1(True)
-#	# save model at end of epoch
-#	save_checkpoint(model_file)
-#	# time and output
-#	toc = time.time() - tic
-#	print('Epoch: {0} done in time {1}s'.format(epoch, toc))
-#	testing()
+trian_loss_sum = 0.0
+train_samples = 0
+for epoch in range(num_epochs):
+	tic = time.time()
+	scheduler.step()
+	# training step
+	training_m1(True)
+	# save model at end of epoch
+	save_checkpoint(model_file)
+	# time and output
+	toc = time.time() - tic
+	print('Epoch: {0} done in time {1}s'.format(epoch, toc))
+	testing()
 	
 
 
